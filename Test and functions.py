@@ -411,6 +411,9 @@ def Leader_board_screen():
     Leader_board_Render = True            
     while Leader_board_Render == True:
         
+        for event in pygame.event.get(eventtype=pygame.QUIT):
+            pygame.quit()
+            sys.exit()
 
         pygame.draw.rect(screen, 'white', (SCREEN_WIDTH/2 -152, 48, 304, 504))
         pygame.draw.rect(screen, 'black', (SCREEN_WIDTH/2 -150, 50, 300, 500))
