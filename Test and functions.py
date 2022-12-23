@@ -1,4 +1,4 @@
-import pygame, sys
+import pygame, sys, time
 
 from pygame.math import Vector2
 
@@ -11,13 +11,13 @@ import random
 from pygame.locals import (
     RLEACCEL,
     K_UP,
-    K_DOWN,
     K_LEFT,
     K_RIGHT,
     K_SPACE,
 )
 
 pygame.init()
+pygame.font.init()
 
 # Definition of screen limits
 SCREEN_WIDTH = 800
@@ -25,6 +25,10 @@ SCREEN_HEIGHT = 600
 
 # screen initialization
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+
+#font initialization
+gameoverfont = pygame.font.SysFont('Corbel', 50)
+gamefont = pygame.font.SysFont('Corbel', 17)
 
 fpsClock=pygame.time.Clock()
 FPS = 30 
@@ -70,11 +74,6 @@ class Player(pygame.sprite.Sprite):
             velToAdd = Vector2(0,0.1)
             velToAdd = velToAdd.rotate(self.angle)
             self.velocity = self.velocity - velToAdd
-
-        if pressed_keys[K_DOWN]:
-            velToAdd = Vector2(0,0.1)
-            velToAdd = velToAdd.rotate(self.angle)
-            self.velocity = self.velocity + velToAdd
 
         if pressed_keys[K_LEFT]:
             self.angle = self.angle - 5
@@ -209,8 +208,11 @@ def player_collision(player: Player, comets):
     
 # collision between a bullet and any comet
 def bullet_collision(bullet: Bullet, comets):
+    global Score
+
     collider:Comet = pygame.sprite.spritecollideany(bullet, comets)
     if collider:
+        Score += 1 #Increments score for each comet kill
         bullet.kill()
         comets_spawn(collider)
         if collider.lvl==3:
@@ -258,11 +260,181 @@ comet_level1_trailer = []
 spawn_new_level1_comet(Vector2(random.randint(0,100),random.randint(0,100)),Vector2(random.random()*4-2,random.random()*4-2))
 spawn_new_level1_comet(Vector2(random.randint(700,800),random.randint(500,600)),Vector2(random.random()*4-2,random.random()*4-2))
 
-# marker to maintain game status
-Game_Ended = False
 
-# main loop for testing purposes
-while True: #not Game_Ended:
+
+"Game Over UI"
+#Renders Game_Over over the screen for 3 seconds
+def Game_Over():
+    global Game_End, start_time
+
+    for event in pygame.event.get(eventtype=pygame.QUIT):
+        pygame.quit()
+        sys.exit()
+
+    #renders GameOver on screen
+    screen.blit(gameoverfont.render("Game Over", True, 'White'), (SCREEN_WIDTH/2 -100, SCREEN_HEIGHT/2 -25))
+
+    #gets current time, if 3 seconds since gameover have passed, proceed to leaderboard
+    if (time.time() - start_time) > 3:
+        Game_End = False
+    
+    pygame.display.update()
+    fpsClock.tick(FPS)
+
+
+
+"Start Screen UI"
+def Start_screen():
+    global startscreen
+
+    def checkmousestate(button):
+        if button.collidepoint(pygame.mouse.get_pos()):  #Based on answer by skrx on StackOverfow (https://stackoverflow.com/questions/44998943/how-to-check-if-the-mouse-is-clicked-in-a-certain-area-pygame)
+            pygame.draw.rect(screen, 'red', button, 1)
+            for event in pygame.event.get(eventtype=MOUSEBUTTONDOWN):
+                if event.button == 1:
+                    print("a")
+                    return True
+    
+    #defines any necessary variables
+    start_button = pygame.Rect(SCREEN_WIDTH/2 -100, SCREEN_HEIGHT/2 -25, 200, 50)
+    exit_button = pygame.Rect(SCREEN_WIDTH/2 - 100, SCREEN_HEIGHT/2 +50, 200, 50)
+    
+    for event in pygame.event.get(eventtype=pygame.QUIT):
+        pygame.quit()
+        sys.exit()
+
+    #Renders start menu elements
+    screen.fill('black')
+    
+    pygame.draw.rect(screen, 'white', start_button, 1)
+    pygame.draw.rect(screen, 'white', exit_button, 1)
+
+    screen.blit(gameoverfont.render("Comets", False, 'white'), (SCREEN_WIDTH/2 - 87, 100))
+    screen.blit(gamefont.render("Start", False, 'white'), (start_button[0] +75, start_button[1] +15))
+    screen.blit(gamefont.render("Exit", False, 'white'), (exit_button[0] +75, exit_button[1] +15))
+    
+    if checkmousestate(start_button) == True:
+        startscreen = False
+    elif checkmousestate(exit_button) == True:
+        pygame.quit()
+        sys.exit()
+
+    pygame.display.flip()
+    fpsClock.tick(FPS)
+
+
+
+"Leaderboard UI"
+#Renders a leaderboard, asks for initials if score in top 10
+def Leader_board_screen():
+    global Score, score_already_checked
+
+    for event in pygame.event.get(eventtype=pygame.QUIT):
+        pygame.quit()
+        sys.exit()
+    
+    allkeys = { #needed to input initials for score 
+    K_a : "A",
+    K_b : "B",
+    K_c : "C",
+    K_d : "D",
+    K_e : "E",
+    K_f : "F",
+    K_g : "G",
+    K_h : "H",
+    K_i : "I",
+    K_j : "J",
+    K_k : "K",
+    K_l : "L",
+    K_m : "M",
+    K_n : "N",
+    K_o : "O",
+    K_p : "P",
+    K_q : "Q",
+    K_r : "R",
+    K_s : "S",
+    K_t : "T",
+    K_u : "U",
+    K_v : "V",
+    K_w : "W",
+    K_x : "X",
+    K_y : "Y",
+    K_z : "Z",
+}   
+    if score_already_checked == False: #Because this is inside a loop, this prevents the following code to loop
+
+        with open('Leaderboard.txt', 'r+') as fread: #opens leaderboard.txt in read and write mode:
+            leaderboardtext = fread.readlines()
+            line_num = -1 #keeps track of current line number
+            for line in leaderboardtext: #checks each line for a score
+                line_num += 1
+                saved_score = line[4] + line[5] + line[6] + line[7] #temporarily saves the read score
+                if Score > 0:
+                    if int(saved_score) < Score: #checks is saved score is smaller than current score
+
+                        initials = "" 
+                        while len(initials) < 3:
+                            
+                            screen.fill('black')
+                            
+                            pygame.draw.rect(screen, 'white', (SCREEN_WIDTH/2 -152, 48, 304, 504))
+                            pygame.draw.rect(screen, 'black', (SCREEN_WIDTH/2 -150, 50, 300, 500))
+                            screen.blit(gamefont.render("Insert your 3 initials", False, 'white'), (SCREEN_WIDTH/2 - 75, SCREEN_HEIGHT/2 - 25))
+                            screen.blit(gamefont.render(f"Initials : {initials}", False, 'white'), (SCREEN_WIDTH/2 - 25, SCREEN_HEIGHT/2))
+                            
+                            for event in pygame.event.get(eventtype=KEYDOWN):
+                                try:
+                                    initials = initials + allkeys[event.key] #adds the pressed key to the initials string
+                                except KeyError:
+                                    pass    
+                            pygame.display.update()
+                            fpsClock.tick(FPS)
+                            
+                        strscore = str(Score) #converts score to a string
+                        while len(strscore) < 4: #checks if score's number of algarisms is smaller than 4 
+                            strscore = "0" + strscore #adds 0s so the score gets into a 4 algarism number
+
+                        new_score = f"{initials} {strscore}" #gets initals and score together in a string
+                        leaderboardtext.insert(line_num, new_score) #writes initials and score into the current line
+
+                        print(leaderboardtext)
+                        Score = 0
+                        try:
+                            leaderboardtext.pop[10]
+                        except TypeError:
+                            pass
+
+                        score_already_checked = True
+
+    start_time = time.time()
+
+    Leader_board_Render = True            
+    while Leader_board_Render == True:
+        
+
+        pygame.draw.rect(screen, 'white', (SCREEN_WIDTH/2 -152, 48, 304, 504))
+        pygame.draw.rect(screen, 'black', (SCREEN_WIDTH/2 -150, 50, 300, 500))
+        screen.blit(gamefont.render("Top 10", False, 'white'), (SCREEN_WIDTH/2 -25, 75))
+
+        with open('Leaderboard.txt', 'r+') as fread: 
+            n = 0  #Increments for every line in leaderboard.txt, rendering every line one above another
+            for line in fread:
+                n += 1
+                screen.blit(gamefont.render(line, False, 'white'), (SCREEN_WIDTH/2 -25, 100 + 25 * n))
+        
+        if (time.time() - start_time) > 6:
+            Leader_board_Render = False
+
+
+        pygame.display.update()
+        fpsClock.tick(FPS)
+
+
+
+"Game Screen UI"   
+def Game_screen():
+    global gameloop
+    
     screen.fill("black")
     for event in pygame.event.get():
         if event.type == QUIT:
@@ -283,7 +455,7 @@ while True: #not Game_Ended:
 
     for entity in players:
         if player_collision(entity, comets):
-                Game_Ended = True
+                gameloop = False
 
     screen.blit(bg, bg.get_rect())
 
@@ -294,8 +466,44 @@ while True: #not Game_Ended:
     for entity in comets:
         screen.blit(entity.surf, entity.rect)
 
+    screen.blit(gamefont.render(f"Score: {Score}", False, 'white'), (SCREEN_WIDTH/2 - 25, 50))
+    
     pygame.display.update()
     fpsClock.tick(FPS)
+
+
+# variable to track score
+Score = 0
+
+# variable to check when gameover and leaderboard start
+check = 0
+
+
+"""MAIN LOOP"""
+
+while True:
+    startscreen = True
+    while startscreen == True:
+        Start_screen()
+
+    gameloop = True
+    while gameloop == True: #not Game_Ended:
+        Game_screen()
+        
+
+    #gets current time and sets a duration
+    max_time = 3
+    start_time = time.time()
+
+    Game_End = True
+    while Game_End == True:
+        Game_Over()
+    
+
+    score_already_checked = False
+    Leader_board_screen() #This screen is out of a loop as it already has a loop internaly
+    
+
 
 #pygame.quit()
 #sys.exit()
